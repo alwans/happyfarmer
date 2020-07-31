@@ -1,0 +1,16 @@
+{
+  "name": "happyfarmer",
+  "version": "1.0.0",
+  "description": "heihei",
+  "main": "init.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "alwans",
+  "license": "ISC",
+  "devDependencies": {
+    "cypress": "^4.11.0",
+    "log4js": "^6.3.0",
+    "uuid": "^8.3.0"
+  }
+}
