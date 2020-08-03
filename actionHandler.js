@@ -1,5 +1,5 @@
-const untils = require("./untils")
-const { printLog, random } = require("./untils")
+const untils = require("./utils")
+const { printLog, random } = require("./utils")
 
 const longTimeEvent = ['youtubeEvent'];
 const masterEvent=['gmailEvent','nwesEvent'];
@@ -100,14 +100,6 @@ const getPollTime = function(runTime){
     return poll_time;
 }
 
-async function i_wait(timeInt){
-	return new Promise((resolve,reject) =>{
-		setTimeout(function(){
-			let n = null;
-			resolve();
-		},timeInt);
-	});
-}
 
 module.exports ={
     runAction
