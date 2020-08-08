@@ -43,6 +43,54 @@ const i_wait = async function(timeInt){
 	});
 }
 
+/**
+ * 
+ * @param {*} num 
+ */
+const rateRun = function(num){
+    switch(random(0,num)){
+        case 0:{
+            return true;
+        }
+        default:{
+            return false;
+        }
+    }
+}
+
+/**
+ * 
+ * @param {int} num 
+ * @param {*} minTime /s
+ * @param {*} maxTime /s
+ */
+const stayForTime = async function (rateNum,minTime,maxTime){
+    if(rateRun(rateNum)){
+        let t = random(minTime*1000,maxTime*1000);
+        await i_wait(t);
+    }
+}
+
+const durationTime = function(startTime,times){
+    let endTime = Date.now();
+    let interval = (endTime - startTime)/1000/60;
+    return times>interval ? true: false;
+}
+
+/**
+ * if timeout return -1
+ * @param {*} promise 
+ * @param {*} delay 
+ */
+const promiseTimeout = async function (promise, delay){
+    let timeout = new Promise(function(reslove, reject){
+        setTimeout(function(){
+            reslove(-1)
+        }, delay)
+    })
+    return Promise.race([timeout, promise])
+}
+
 // console.log(random(3,6));
 
 
@@ -50,7 +98,12 @@ module.exports={
     currentTime,
     getUUID,
     printLog,
-    random
+    random,
+    i_wait,
+    durationTime,
+    stayForTime,
+    rateRun,
+    promiseTimeout
 }
 
 

@@ -10,7 +10,9 @@
   "license": "ISC",
   "devDependencies": {
     "cypress": "^4.11.0",
+    "google-trends-api": "^4.9.0",
     "log4js": "^6.3.0",
+    "puppeteer": "^5.2.1",
     "uuid": "^8.3.0"
   }
 }

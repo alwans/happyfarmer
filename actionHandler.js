@@ -1,76 +1,99 @@
 const untils = require("./utils")
-const { printLog, random } = require("./utils")
+const { printLog, random } = require("./utils");
+const { runYoutube } = require("./action/youtubeAction");
+const { runGmail } = require("./action/gmailAction");
+const { runWatchNews } = require("./action/newsAction");
+const { runSearch } = require("./action/serachAction");
 
 const longTimeEvent = ['youtubeEvent'];
 const masterEvent=['gmailEvent','nwesEvent'];
-const branchEvent=['translateEvent','searchEvent'];
+const branchEvent=['searchEvent'];//'translateEvent',
 
 const runAction = async function(obj){
+    // console.log(obj);
     let runTime = untils.random(20,50);
-    let poll_time = getPollTime(runTime);
+    let poll_time = getPollTime(obj,runTime);
     let events = pipeEvent(runTime);
     for(event of events){
-
+        switch(event.eventName){
+            case 'youtubeEvent':{
+                await runYoutube(obj,event);
+                break;
+            }
+            case 'gmailEvent':{
+                await runGmail(obj,event);
+                break;
+            }
+            case 'nwesEvent':{
+                await runWatchNews(obj,event);
+                break;
+            }
+            case 'searchEvent':{
+                await runSearch(obj,event);
+                break;
+            }
+        }
     }
-    // let type = untils.random(1,3);
-    // switch(type){
-    //     case type=1:{
-    //         runGmailEvent(obj);
-    //         break;
-    //     }
-    //     case type=2:{
-    //         runYoutubeEvent(obj);
-    //         break;
-    //     }
-    //     case type=3:{
-    //         runNewsEvent(obj);
-    //         break;
-    //     }
-    //     case type=4:{
-    //         runTranslateEvent(obj);
-    //         break;
-    //     }
-    //     case type=5:{
-    //         runSearchEvent(obj);
-    //         break;
-    //     }
-    // }
     return poll_time;
 }
 
 const pipeEvent = function(runTime){
-    let preNum =0
+    console.log('runTime: ',runTime);
+    let preNum =[];
     let events = [];
     let oriEvents = masterEvent.concat(branchEvent).concat(longTimeEvent);
     let isIncludeYoutube = false;
-    for(let n in random(3,6)){
-        let num = random(0,5);
-        while(preNum==num){
-            num = random(0,5);
+    let for_num = random(3,5)
+    while(for_num>0){
+        let num = random(0,4);
+        while(preNum.indexOf(num)>-1){
+            num = random(0,4);
         }
-        preNum = num;
-        if(oriEvents[num]=='youtubeEvent'){
+        preNum.push(num);
+        if(!isIncludeYoutube && oriEvents[num]=='youtubeEvent'){
             isIncludeYoutube = true;
         }
-        events.push({eventName:oriEvents[num]});
+        events.push({eventName:oriEvents[num],times:0});
+        for_num--;
     }
     if(runTime>=35 && !isIncludeYoutube){
-        events.push({eventName:longTimeEvent[0]});
+        events.push({eventName:longTimeEvent[0],times:0});
     }
-    return setEventRunTime(events);
+    return setEventRunTime(events,runTime);
 }
-const setEventRunTime = function(events){
-    // if
+const setEventRunTime = function(events,runTime){
+    if(runTime>35){
+        events.map((obj) =>{
+            if(obj.eventName==longTimeEvent[0]){
+                obj.times = random(20,30);
+                runTime = runTime-obj.times;
+            }
+        });
+    }
+    let pos = 0;
+    events.map((obj,index) =>{
+        let svgTime = parseInt(runTime/(events.length-pos));
+        pos++;
+        if(obj.times==0){
+            if(index==events.length-1){
+                obj.times = runTime;
+            }else{
+                obj.times = random(parseInt(svgTime/2),svgTime*2);
+                runTime = runTime - obj.times;
+            }
+        }
+    });
     return events;
 }
 
-const getPollTime = function(runTime){
+const getPollTime = function(obj,runTime){
     let hour = untils.currentTime().split(':')[0];
     let min = untils.currentTime().split(':')[1];
     let poll_time = 1000;
     if(hour<9){
         obj.taskCount=0; //reset every day run counts
         obj.sumCount=untils.random(100,150) //reset every day run max counts
+        obj.news.homeNews.length=0;
         poll_time = ((9-hour)*60+untils.random(10,30)-min);
         printLog(`task(${obj.id}) reset counts,taskcout: ${obj.taskCount}, sumCount: ${obj.sumCount}`);
     }else if(obj.taskCount<=obj.sumCount){
