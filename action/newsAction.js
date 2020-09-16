@@ -1,10 +1,12 @@
 const { printLog, random, i_wait,promiseTimeout, rateRun,durationTime } = require("../utils");
-const { goto_url } = require("../launchBrowser");
+const { goto_url, page_scroll } = require("../launchBrowser");
+const { pop } = require("puppeteer/DeviceDescriptors");
 
 const news_url = 'https://news.google.com/';
 
 
 const runWatchNews = async function(obj,event){
+    let page = obj.page;
     printLog(`task(${obj.id}) start run watch news...,run time: ${event.times} min`);
         let startTime = Date.now();
         while(durationTime(startTime,event.times)){
@@ -15,7 +17,7 @@ const runWatchNews = async function(obj,event){
                     if(current_url.indexOf('https://news.google.com/topstories?')<0){
                         await obj.page.goto(news_url,{
                             timeout: 0,
-                            waitUntil: ['domcontentloaded','networkidle2']
+                            waitUntil: 'domcontentloaded',
                         });
                         // await page.waitForNavigation();
                     }
@@ -38,6 +40,115 @@ const runWatchNews = async function(obj,event){
         }
 
     printLog(`task(${obj.id}) run watch news task ..... end`);
+}
+
+const webkit_homePageNews = async function(obj){
+    let page = obj.page;
+    // await goto_news_homePage(obj);
+    let pos = 0;
+    let counts = random(1,4);
+    printLog(`task(${obj.id}) start browse homepage news...`);
+    while(pos<counts){
+        let links=[];
+        try{
+            await i_wait(3000);
+            await page_random_scroll(obj);
+            await page.mouse.move(random(100,300),random(200,500));
+            links = await page.$$('.VDXfz');
+        }catch(e){
+            printLog(`task(${obj.id}) get homepage news is err, err: ${e}`);
+            return -1;
+        }
+        var news = [];
+        for(let i=0;i<links.length;i++){
+            // console.log(await links[i].boundingBox());
+            if(await links[i].boundingBox()!=null){
+                news.push(links[i]);
+            }
+        }
+        if(news.length==0) return -1;
+        let index = random(0,news.length);
+        // console.log('news count: ',news.length);
+        // console.log('selected index: ',index);
+        let boundingBox = await news[index].boundingBox();
+        // console.log('boundingBox :',boundingBox);
+        await news[index].scrollIntoViewIfNeeded();
+
+        links = await page.$$('.VDXfz');
+        news.length=0;
+        for(let i=0;i<links.length;i++){
+            // console.log(await links[i].boundingBox());
+            if(await links[i].boundingBox()!=null){
+                news.push(links[i]);
+            }
+        }
+        boundingBox = await news[index].boundingBox();
+        // console.log('new boundingBox: ',boundingBox);
+        await i_wait(random(3000,5000));
+        printLog(`task(${obj.id}) start click news url...`);
+        const [popup] = await Promise.all([
+            page.waitForEvent('popup'),
+            page.mouse.click(boundingBox.x,boundingBox.y)
+        ]);
+        // console.log(popup);
+        // console.log(page==popup);
+        // console.log(await popup.evaluate('location.href'));
+        if(await obj.context.pages().length>1){
+            printLog(`task(${obj.id}) goto news detail page...`);
+            await webkit_watchDetailsPage(obj.context.pages()[1]);
+            await i_wait(5000);
+            await obj.context.pages()[1].close();
+            await page.bringToFront()
+        }else{
+            printLog(`task(${obj.id}) click open news details page is error`);
+        }
+        // await page.mouse.click(boundingBox.x,boundingBox.y);
+        // let newPage = await promiseTimeout(newPagePromise(obj), 30000);
+        // if(newPage==-1){
+        //     printLog(`task(${obj.id}) click open news details page is error, start browse next news`);
+        //     // return -1;
+        // }else{
+        //     printLog(`task(${obj.id}) goto news detail page...`);
+        //     try{
+        //         await newPage.waitForNavigation();
+        //     }catch(e){}
+        //     let pages = await obj.context.pages();
+        //     if(pages.length>1){
+        //         await webkit_watchDetailsPage(newPage);
+        //     }
+        //     pages = await obj.context.pages();
+        //     if(pages.length>1){
+        //         printLog(`task(${obj.id}) close news page`);
+        //         for(let i= 1;i<pages.length;i++){
+        //             await pages[i].close();
+        //         }
+        //         await page.bringToFront()
+        //     }
+            let t1 = random(3*1000,8*1000);//random(5*1000,30*1000);
+            printLog(`task(${obj.id}) go back news home page, stay time: ${t1/1000}s`);
+            await i_wait(t1);
+            pos++;
+        // }
+    }
+}
+
+const page_random_scroll = async function(obj){
+    let page = obj.page;
+    let pos = 0;
+    let counts = random(2,5);
+    // console.log('counts: ',counts);
+    while(pos<counts){
+        pos++;
+        if(rateRun(7)){
+            // console.log('uuuuuuu');
+            await page_scroll(page,3,'ArrowUp');
+        }else{
+            // console.log('dddddd');
+            await page_scroll(page,3,'ArrowDown');
+        }
+        await page.mouse.move(random(0,200),random(0,200));
+        await i_wait(random(3000,6000));
+    }
 }
 
 const homePageNews = async function(obj){
@@ -74,8 +185,8 @@ const homePageNews = async function(obj){
         //     index = random(0,news.length);
         // }
         // obj.news.homeNews.push(index);
-        console.log('news count: ',news.length);
-        console.log('selected index: ',index);
+        // console.log('news count: ',news.length);
+        // console.log('selected index: ',index);
         let boundingBox = await news[index].boundingBox();
         // console.log(boundingBox);
         // let page_height = await page.evaluate(_ =>{return window.screen.availHeight})
@@ -177,17 +288,44 @@ const hotsNews = async function(obj){
     if(current_url.indexOf('https://news.google.com/topstories?')<0){
         await obj.page.goto(news_url,{
             timeout: 0,
-            waitUntil: ['domcontentloaded','networkidle2']
+            waitUntil: 'domcontentloaded',
         });
         // await page.waitForNavigation();
     }
     await i_wait(5000);
     let topics = await page.$$('.boy4he');
-    await topics[random(0,topics.length)].click();
-    await page.waitForNavigation();
+    const [response] = await Promise.all([
+        page.waitForNavigation(), // The promise resolves after navigation has finished
+        await topics[random(0,topics.length)].click(), // Clicking the link will indirectly cause a navigation
+    ]);
     printLog(`task(${obj.id}) start browse topics news`);
-    await homePageNews(obj);
+    if(obj.platform='webkit'){
+        await webkit_homePageNews(obj);
+    }else{
+        await homePageNews(obj);
+    }
     printLog(`task(${obj.id}) start browse topics news...end`);
+}
+
+const webkit_watchDetailsPage = async function(page){
+    // let scroll_height = await page.evaluate(_ => document.body.scrollHeight)-random(700,900);
+    // console.log('scroll_height: ',scroll_height);
+    await i_wait(5000);
+    let pos = 0;
+    let counts = random(5,10);
+    while(pos<counts){
+        pos++;
+        // console.log('scroll_height= ',scroll_height);
+        if(rateRun(8)){
+            // console.log('uuuuuuu');
+            await page_scroll(page,3,'ArrowUp');
+            await i_wait(random(30*1000,120*1000));
+        }else{
+            // console.log('ddddddd');
+            await page_scroll(page,3,'ArrowDown');
+            await i_wait(random(30*1000,120*1000));
+        }
+    }
 }
 
 const watchDetailsPage = async function(page){
@@ -249,7 +387,11 @@ const itemNews = async function(obj){
     let index = random(0,items.length);
     await items[index].click();
     printLog(`task(${obj.id}) start browse ${index} item news`);
-    await homePageNews(obj);
+    if(obj.platform='webkit'){
+        await webkit_homePageNews(obj);
+    }else{
+        await homePageNews(obj);
+    }
     printLog(`task(${obj.id}) start browse ${index} item news...end`);
 }
 
@@ -272,7 +414,7 @@ const goto_news_homePage = async function(obj){
 
 const newPagePromise = async function (obj){
     return new Promise(res => 
-        obj.browser.once('targetcreated', 
+        obj.context.once('targetcreated', 
           target => res(target.page())
         )
     );

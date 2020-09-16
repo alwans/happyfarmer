@@ -91,6 +91,27 @@ const promiseTimeout = async function (promise, delay){
     return Promise.race([timeout, promise])
 }
 
+/**
+ * only use for playwright 
+ * @param {} proxy 
+ */
+const formatProxy = function(proxy){
+    let proxy_obj = null;
+    if(proxy.split(':').length>2){
+        let p = proxy.split(':');
+        proxy_obj = {
+            server: p[0].indexOf('http')>-1 ? `${p[0]}:${p[1]}`:`http://${p[0]}:${p[1]}`,
+            username: p[2],
+            password: p[3]
+        }
+    }else{
+        proxy_obj = {
+            server:proxy.indexOf('http')>-1 ? proxy:`http://${proxy}`
+        }
+    }
+    return proxy_obj;
+}
+
 // console.log(random(3,6));
 
 
@@ -103,7 +124,9 @@ module.exports={
     durationTime,
     stayForTime,
     rateRun,
-    promiseTimeout
+    promiseTimeout,
+    formatProxy
+
 }
 
 

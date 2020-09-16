@@ -1,21 +1,69 @@
 const { printLog, durationTime, random, i_wait,stayForTime,rateRun } = require("../utils");
-const {clearText, autoScroll, mouseRandomWheel, mouseRandomMove, goto_url} = require('../launchBrowser');
+const {clearText, autoScroll, mouseRandomWheel, mouseRandomMove, goto_url, page_wait,page_scroll} = require('../launchBrowser');
 const search_url = 'https://www.google.com/';
 
 
 const runSearch = async function(obj,event){
-    printLog(`task(${obj.id}) start run search task...,run time: ${event.times}min`);
+    printLog(`task(${obj.id}) start run search task...,run time: ${event.times} min`);
     let startTime = Date.now();
     let imageWords = ['rugby player','football palyer','basketball player'];
     let words = ['java == equals','puppeteer api','tiktok followers'];
     while(durationTime(startTime,event.times)){
         if(rateRun(4)){
-            await image_search(obj,obj.page,imageWords[random(0,3)]);
+            if(obj.platform='webkit'){
+                await webkit_image_search(obj,obj.page,imageWords[random(0,3)]);
+            }else{
+                await image_search(obj,obj.page,imageWords[random(0,3)]);
+            }
         }else{
             await word_search(obj,obj.page,words[random(0,3)]);
         }
     }
     printLog(`task(${obj.id}) run search task ..... end`);
+}
+
+const webkit_image_search = async function(obj,page,keyWord){
+    printLog(`task(${obj.id}) search image keyword: ${keyWord}`);
+    await search_keyWord(obj,page,keyWord);
+    let search_types = await page.$$('.hdtb-mitem');
+    // console.log(search_types);
+    if(search_types.length>0){
+        for(let v of search_types){
+            if(await (await v.getProperty('innerText')).jsonValue()=='Images' || await (await v.getProperty('innerText')).jsonValue()=='图片'){
+                await v.click();
+                await page.waitForSelector('a[jsname="sTFXNd"]');
+                break;
+            }
+        }
+    }
+    let pos = 0;
+    let counts = random(10,15);
+    printLog(`task(${obj.id}) start click image...`);
+    while(pos<counts){
+        let images = await page.$$('a[jsname="sTFXNd"]');
+        // console.log('marks counts: ',marks.length);
+        let index = random(0,images.length>=80?80:images.length);
+        // console.log('index: ',index);
+        await page.mouse.move(random(800,1000),random(500,800));
+        await images[index].scrollIntoViewIfNeeded();
+        boundingBox = await images[index].boundingBox();
+        await i_wait(random(3000,5000));
+        await page.mouse.click(boundingBox.x,boundingBox.y);
+        let t1 = random(5*1000,15*1000);//random(5*1000,30*1000);
+        printLog(`task(${obj.id}) look up image, stay time: ${t1/1000}s`);
+        // await i_wait(t1);
+        await page_wait(t1,page);
+        let pages = await obj.context.pages();
+        if(pages.length>1){
+            console.log('close other link');
+            for(let i= 1;i<pages.length;i++){
+                await pages[i].close();
+            }
+            await page.bringToFront()
+        }
+        pos++;
+    }
+    printLog(`task(${obj.id}) image keyword: ${keyWord} result look up end`);
 }
 
 const image_search = async function(obj,page,keyWord){
@@ -41,7 +89,8 @@ const image_search = async function(obj,page,keyWord){
         marks = await page.$$('a[jsname="sTFXNd"]');
         // console.log('marks counts: ',marks.length);
         let index = random(0,marks.length>=80?80:marks.length);
-        // console.log('index: ',index);
+        console.log('index: ',index);
+        // await marks[index].scrollIntoViewIfNeeded();
         boundingBox = await marks[index].boundingBox();
         // let h = boundingBox.y-900>0?boundingBox.y-700:0;
         let page_height = await page.evaluate(_ =>{return window.screen.availHeight})
@@ -97,7 +146,11 @@ const image_search = async function(obj,page,keyWord){
 const word_search = async function(obj,page,keyWord){
     printLog(`task(${obj.id}) search keyword: ${keyWord}`);
     await search_keyWord(obj,page,keyWord);
-    await watchResult(obj,page);
+    if(obj.platform='webkit'){
+        await webkit_watchResult(obj,page);
+    }else{
+        await watchResult(obj,page);
+    }
     printLog(`task(${obj.id}) keyword: ${keyWord} result look up end`);
 }
 
@@ -117,10 +170,100 @@ const search_keyWord = async function(obj,page,keyWord){
         await page.waitForNavigation();
     }
     if(flag==-1){
-        await page.keyboard.press('Enter');
-        await page.waitForNavigation();
+        const [response] = await Promise.all([
+            page.waitForNavigation(), // The promise resolves after navigation has finished
+            await page.keyboard.press('Enter'), // Clicking the link will indirectly cause a navigation
+        ]);
     }
 
+}
+
+const webkit_watchResult = async function(obj,page){
+    let pos = 0;
+    let counts = random(2,5);
+    console.log('counts: ',counts);
+    while(pos<counts){
+        pos++;
+        if(rateRun(5)){
+            console.log('uuuuuuu');
+            await page_scroll(page,3,'ArrowUp');
+        }else{
+            console.log('dddddd');
+            await page_scroll(page,3,'ArrowDown');
+        }
+        await page.mouse.move(random(0,200),random(0,200));
+        await i_wait(random(600,3000));
+    }
+    let results = await page.$$('h3');//search result list
+    if(results.length>10){
+        results = results.splice(0,10);
+    }
+    let result_index = random(0,results.length-1);
+    console.log(result_index);
+    console.log(results[result_index]);
+    let boundingBox =  await results[result_index].boundingBox();
+    console.log('boungingBox: ',boundingBox);
+    try{
+        await results[result_index].scrollIntoViewIfNeeded();
+        results.length=0;
+        results = await page.$$('h3');
+        boundingBox = await results[result_index].boundingBox();
+        console.log('new boundingBox: ',boundingBox);
+        console.log('start click');
+        const [response] = await Promise.all([
+            page.waitForNavigation(), // The promise resolves after navigation has finished
+            page.mouse.click(boundingBox.x,boundingBox.y), // Clicking the link will indirectly cause a navigation
+        ]);
+        // await page.mouse.click(boundingBox.x,boundingBox.y);
+        // await page.waitForNavigation({timeout:15000,waitUntil:['domcontentloaded'] });
+    }catch(e){
+        console.log(e);
+        // results = await page.$$('h3');
+        // let new_idnex = random(0,3);
+        // await results[new_idnex].scrollIntoViewIfNeeded();
+        // boundingBox = await results[new_idnex].boundingBox();
+        // console.log('new boungingBox: ',boundingBox);
+        // console.log('start click');
+        // const [response] = await Promise.all([
+        //     page.waitForNavigation(), // The promise resolves after navigation has finished
+        //     page.mouse.click(boundingBox.x,boundingBox.y), // Clicking the link will indirectly cause a navigation
+        // ]);
+    }
+    let current_url = await page.evaluate(_ =>{return document.URL});
+    if(current_url.indexOf('https://www.google.com/search?')>-1){
+        // console.log(results[result_index]);
+        try{
+            await results[result_index].click();
+            await page.waitForNavigation();
+        }catch(e){
+            console.log('>>>>>>>>>>>>>>>>>>>>>>>>>>>>>');
+            await results[0].click();
+            try{
+                await page.waitForNavigation({timeout:5000});
+            }catch(e){
+
+            }
+        }
+    }
+    printLog(`task(${obj.id}) look up search result detail page...`);
+    pos = 0;
+    counts = random(3,6);
+    while(pos<counts){
+        pos++;
+        if(rateRun(5)){
+            console.log('wheel up read');
+            await page_scroll(page,5,'ArrowUp');
+        }else{
+            console.log('wheel down read');
+            await page_scroll(page,5,'ArrowDown');
+        }
+        await page.mouse.move(random(0,200),random(0,200));
+        await i_wait(random(30*1000,60*1000));
+    }
+    await mouseRandomMove(page);
+    let t = random(30*1000,60*1000);
+    printLog(`task(${obj.id}) page stay time: ${t/1000}s`);
+    await i_wait(t);
 }
 
 const watchResult = async function(obj,page){
@@ -130,6 +273,7 @@ const watchResult = async function(obj,page){
     }
     let result_index = random(0,results.length-1);
     // console.log(result_index);
+    // await results[result_index].scrollIntoViewIfNeeded();
     let boundingBox =  await results[result_index].boundingBox();
     let pos = 0;
     let h = await page.evaluate(_ =>{return document.body.scrollHeight;});
@@ -150,6 +294,7 @@ const watchResult = async function(obj,page){
         await page.mouse.move(random(0,200),random(0,200));
         await i_wait(3000);
     }
+
     // if(boundingBox==null){
     //     boundingBox =  await results[random(0,2)].boundingBox();
     // }
@@ -227,12 +372,12 @@ const goto_search_page = async function(obj,page){
     // let page = obj.page;
     let current_url = await page.evaluate(_ =>{return document.URL});
     if(current_url!=search_url && current_url.indexOf('https://www.google.com/search?')<0){
-        await page.goBack({
-            timeout :0,
-            waitUntil :['domcontentloaded','networkidle2']
-        }); 
+        await page.goBack(); 
         try{
-            await page.waitForNavigation({timeout:3000});
+            await page.waitForNavigation({
+                timeout:3000,
+                waitUntil:['domcontentloaded']
+            });
         }catch(e){
 
         }

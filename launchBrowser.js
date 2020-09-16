@@ -1,5 +1,8 @@
 const puppeteer = require('puppeteer');
-const { getUUID, random, i_wait, printLog,rateRun } = require('./utils');
+const {webkit} = require('playwright');
+const chromePaths = require('chrome-paths');
+const { getUUID, random, i_wait, printLog,rateRun, formatProxy } = require('./utils');
+const { writeCookies, restoreCookies } = require('./write_cookies');
 
 
 const browser_param_init = function(proxy){
@@ -13,9 +16,32 @@ const browser_param_init = function(proxy){
     return params;
 }
 
+const launchWebkit = async function(info){
+    let proxy_obj = formatProxy(info.proxy)
+    let browser = await webkit.launch({
+        headless: false,
+        slowMo: 25,
+        proxy:proxy_obj
+    });
+    await login_to_google(info.gmail,info.password,proxy_obj);
+    let cookies = await restoreCookies(info.gmail.split('@')[0]);
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await page.context().addCookies(cookies);
+    return {
+        id:getUUID(),
+        browser:browser,
+        context:context,
+        page:page,
+        taskCount:0,//every data task run count
+        sumCount:random(100,150),
+        platform:'webkit'
+    }
+}
+
 const launchBrowser = async function(info){
     let browser = await puppeteer.launch({
-        executablePath: 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome',
+        executablePath: chromePaths.chrome,
         userDataDir:info.userDataDir||'',
         defaultViewport:null,
         handleSIGINT:true,//是否可以使用 CTRL+C 关闭并退出浏览器
@@ -43,10 +69,18 @@ const launchBrowser = async function(info){
 }
 
 const goto_url = async function(obj,url){
-    await obj.page.goto(url, {
-        timeout: 0,
-        waitUntil: ['domcontentloaded','networkidle2']
-    });
+    let page = obj.page;
+    if(obj.platform=='webkit'){
+        await page.goto(url,{
+            timeout:0,
+            waitUntil:'domcontentloaded'
+        })
+    }else{
+        await obj.page.goto(url, {
+            timeout: 0,
+            waitUntil: ['domcontentloaded','networkidle2']
+        });
+    }
 }
 
 /**
@@ -161,12 +195,80 @@ const mouseRandomWheel = async function(page){
     }
 }
 
+const page_wait = async function(timeInt,page){
+	return new Promise(async (resolve,reject) =>{
+        let flag = true;
+        setTimeout(function(){
+            flag = false;
+			let n = null;
+			resolve();
+		},timeInt);
+        while(flag){
+            await page.mouse.move(random(700,1000),random(500,800));
+            await i_wait(1000,random(3000,5000));
+        }
+	});
+}
+
+const page_scroll = async function(page,num,str){
+    let pos =0;
+    while(pos<num){
+        pos++;
+        await page.keyboard.press(str);
+    }
+    await i_wait(500);
+    await page.mouse.move(random(700,1000),random(500,800));
+}
+
+const login_to_google = async function(gmail,password,proxy_obj) {
+    try {
+        // const oldProxyUrl = 'http://w1luckw2662:XqOLnFaYnQyVbe7U_country-UnitedStates_session-sQwz53Cu@spa-proxy.com:8080';
+        // const newProxyUrl = await proxyChain.anonymizeProxy(oldProxyUrl);
+        // console.log(newProxyUrl);
+        let cookieName = gmail.split('@')[0];
+        // console.log('cookieName:',cookieName);
+        if( await restoreCookies(cookieName)) {
+            console.log(`${gmail.split('@')[0]} already have google cookies written.`);
+            return true;
+        }
+        let browser = await webkit.launch({ 
+            headless: false,
+            proxy :proxy_obj
+        
+        });
+        const context = await browser.newContext({
+            // httpCredentials: {
+            //     username: `w1luckw2662`,    
+            //     password: `XqOLnFaYnQyVbe7U_country-UnitedStates_session-Hlg6k2LX`
+            // }
+        });
+        let captcha_page = await browser.newPage({ viewport: { width: 400, height: 700 } });
+        await captcha_page.goto('https://www.gmail.com');
+        await captcha_page.waitForSelector('input[type=email]', { timeout: 0 });
+        await captcha_page.type('input[type=email]',gmail);
+        await captcha_page.click('button[jsname=LgbsSe]');
+        await captcha_page.waitForSelector('input[type=password]', { timeout: 0 });
+        await captcha_page.type('input[type=password]',password);
+        await captcha_page.click('button[jsname=LgbsSe]');
+        await captcha_page.waitForSelector('.aim', { timeout: 0 });
+        let cookies = await captcha_page.context().cookies();
+        await writeCookies(cookies,cookieName);
+        await browser.close();
+        return true;
+    } catch(e) {
+        throw(e);
+    }
+}
+
 module.exports = {
     launchBrowser,
+    launchWebkit,
     goto_url,
     i_wheel,
     autoScroll,
     clearText,
     mouseRandomMove,
-    mouseRandomWheel 
+    mouseRandomWheel,
+    page_wait,
+    page_scroll
 }
